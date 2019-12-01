@@ -66,9 +66,9 @@ int check(char mok[20][38][4]){	// 1 : o승 2 : x승 3: 무승부
 						for(jj=1;jj<5;jj++){
 							if(strcmp(mok[o_checkpoint_v][o_checkpoint_h+jj*2] , "O") == 0)
 								h_o_count++;
-							if(ii*2 == jj && strcmp(mok[o_checkpoint_v+ii][o_checkpoint_h+jj*2] , "O") == 0)
+							if(ii == jj && strcmp(mok[o_checkpoint_v+ii][o_checkpoint_h+jj*2] , "O") == 0)
 								d_o_count++;
-							if(ii*2 == jj && strcmp(mok[o_checkpoint_v+ii][o_checkpoint_h-jj*2] , "O") == 0)
+							if(ii == jj && strcmp(mok[o_checkpoint_v+ii][o_checkpoint_h-jj*2] , "O") == 0)
 								d2_o_count++;
 						}
 					}
@@ -90,9 +90,9 @@ int check(char mok[20][38][4]){	// 1 : o승 2 : x승 3: 무승부
 						for(jj=1;jj<5;jj++){
 							if(strcmp(mok[x_checkpoint_v][x_checkpoint_h+jj*2] , "X") == 0)
 								h_x_count++;
-							if(ii*2 == jj && strcmp(mok[x_checkpoint_v+ii][x_checkpoint_h+jj*2] , "X") == 0)
+							if(ii == jj && strcmp(mok[x_checkpoint_v+ii][x_checkpoint_h+jj*2] , "X") == 0)
 								d_x_count++;
-							if(ii*2 == jj && strcmp(mok[x_checkpoint_v+ii][x_checkpoint_h-jj*2] , "X") == 0)
+							if(ii == jj && strcmp(mok[x_checkpoint_v+ii][x_checkpoint_h-jj*2] , "X") == 0)
 								d2_x_count++;
 						}
 					}
@@ -208,17 +208,21 @@ int main(void){
 	// 	exit(1);
 	// }
 	do{
-		srand(time(NULL));
-		x = rand()%10+1;
-		sleep(1);
-		y = rand()%10+1;
-		// scanf("%d %d", &x, &y);
+		// srand(time(NULL));
+		// x = rand()%10+1;
+		// sleep(1);
+		// y = rand()%10+1;
+		scanf("%d %d", &x, &y);
 		if(x > 19 || y > 19 || x < 1 || y < 1){
 			printf("1~20의 수만 입력해주세요.\n");
+			strcpy(mesg.mtext, "1~20의 수만 입력해주세요.\n");
+			msgsnd(msgid, (void *)&mesg, 80, 0);
 			continue;
 		}
 		if(strcmp(mok[x][y*2-1], "O") == 0 || strcmp(mok[x][y*2-1] , "X") == 0 ){
 			printf("돌이 이미 있습니다.\n");
+			strcpy(mesg.mtext, "돌이 이미 있습니다.\n");
+			msgsnd(msgid, (void *)&mesg, 80, 0);
 			continue;
 		}
 		if(turn){
@@ -229,6 +233,8 @@ int main(void){
 			strcpy(mok[x][y*2-1] , "X");
 			turn = !turn;
 		}
+		strcpy(mesg.mtext, "EM");
+		msgsnd(msgid, (void *)&mesg, 80, 0);
 		system("clear");
 		// printMok(mok);
 		for(int i=0;i<20;i++){
@@ -247,8 +253,6 @@ int main(void){
 			msgsnd(msgid, (void *)&mesg, 80, 0);
 			printf("\n");
 		}
-		strcpy(mesg.mtext, "EM");
-		msgsnd(msgid, (void *)&mesg, 80, 0);
 		gameset = check(mok);
 		if(gameset == 1){
 			// sprintf(buf,"O승리!",inet_ntoa(cli.sin_addr));

@@ -24,6 +24,7 @@ int main(void) {
 	struct mymsgbuf inmsg;
 	key_t key;
 	int msgid, len;
+	int x,y;
 
 	key = ftok("keyfile", 1);
 
@@ -46,11 +47,16 @@ int main(void) {
 		// }
 		msgid = msgget(key, 0);
 		len = msgrcv(msgid, &inmsg, 80, 0, 0);
-		if(strcmp(inmsg.mtext, "EM") == 0){
-			system("clear");
+		if(strcmp(inmsg.mtext, "EM") != 0){
+			printf("%s", inmsg.mtext);
+			if(strcmp(inmsg.mtext, "X 승리!\n") == 0 || strcmp(inmsg.mtext, "O 승리!\n") == 0)
+				break;
 		}
 		else{
-			printf("%s", inmsg.mtext);
+			// for(int k =0; k<11;k++)
+			// 	printf("\n");
+			//scanf("%d %d", &x, &y);
+			system("clear");
 		}
 	}
 	// close(sd);
