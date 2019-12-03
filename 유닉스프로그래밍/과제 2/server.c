@@ -276,22 +276,24 @@ int main(void){
 			scanf("%d %d", &x, &y);
 		}
 		else{
-			len = msgrcv(mesgid, &inmsg, 80, 2, 0);
+			len = msgrcv(mesgid, &inmsg, 80, 0, 0);
 			char *string = inmsg.mtext;
 			cx = atoi(string);
-			len = msgrcv(mesgid, &inmsg, 80, 2, 0);
+			printf("%d\n", cx);
+			len = msgrcv(mesgid, &inmsg, 80, 0, 0);
 			string = inmsg.mtext;
 			cy = atoi(string);
+			printf("%d\n", cy);
 		}
 		if(x > 19 || y > 19 || x < 1 || y < 1){
 			printf("1~20의 수만 입력해주세요.\n");
 			continue;
 		}
-		if(strcmp(mok[x][y*2-1], "O") == 0){
+		if(turn && strcmp(mok[x][y*2-1], "O") == 0){
 			printf("돌이 이미 있습니다.\n");
 			continue;
 		}
-		if(strcmp(mok[cx][cy*2-1] , "X") == 0 ){
+		if(!turn && strcmp(mok[cx][cy*2-1] , "X") == 0 ){
 			strcpy(mesg.mtext, "exist");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
 			continue;
@@ -308,10 +310,10 @@ int main(void){
 			msgsnd(msgid, (void *)&mesg, 80, 0);
 			turn = !turn;
 		}
-		strcpy(mesg.mtext, "EM");
-		msgsnd(msgid, (void *)&mesg, 80, 0);
 		system("clear");
 		printMok(mok);
+		strcpy(mesg.mtext, "EM");
+		msgsnd(msgid, (void *)&mesg, 80, 0);
 		gameset = check(mok);
 		if(gameset == 1){
 			strcpy(mesg.mtext, "O 승리!\n");

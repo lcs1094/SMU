@@ -151,13 +151,14 @@ int main(void) {
 		if(isend){
 			break;
 		}
-		system("clear");
 		if(turn){
 			scanf("%d %d", &x, &y);
 			sprintf(buf,"%d",x);
+			printf("%s\n", buf);
 			strcpy(mesg.mtext, buf);
 			msgsnd(mesgid, (void *)&mesg, 80, 0);
 			sprintf(buf,"%d",y);
+			printf("%s\n", buf);
 			strcpy(mesg.mtext, buf);
 			msgsnd(mesgid, (void *)&mesg, 80, 0);
 			len = msgrcv(msgid, &inmsg, 80, 0, 0);
@@ -167,13 +168,16 @@ int main(void) {
 			}
 			if(strcmp(inmsg.mtext, "complete") == 0){
 				turn = !turn;
+				system("clear");
 				readMok();
 			}
 		}
 		else{
 			len = msgrcv(msgid, &inmsg, 80, 0, 0);
 			if(strcmp(inmsg.mtext, "complete") == 0){
+				system("clear");
 				readMok();
+				turn = !turn;
 			}
 		}
 	}
