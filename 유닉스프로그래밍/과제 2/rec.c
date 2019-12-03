@@ -113,11 +113,17 @@ void readMok(){
 		if(strcmp(inmsg.mtext, "EM") == 0){
 			return;
 		}
-		printf("%s", inmsg.mtext);
-		if(strcmp(inmsg.mtext, "X 승리!\n") == 0 || strcmp(inmsg.mtext, "O 승리!\n") == 0){
+		if(strcmp(inmsg.mtext, "XWIN") == 0){
+			printf("X 승리!\n");
 			isend = true;
 			return;
 		}
+		else if(strcmp(inmsg.mtext, "OWIN") == 0){
+			printf("O 승리!\n");
+			isend = true;
+			return;
+		}
+		printf("%s", inmsg.mtext);
 	}
 }
 int main(void) {
@@ -134,7 +140,7 @@ int main(void) {
 	semid = initsem(1);
 	key = 2015;
     key2 = 11053;
-    mesgid = msgget(key2, IPC_CREAT|0644);
+    mesgid = msgget(key2, 0);
 	msgid = msgget(key, 0);
 	mesg.mtype = 2;
 	struct sigaction act;
@@ -146,22 +152,29 @@ int main(void) {
 		perror("sigaction");
 		exit(1);
 	}
-	
+	len = msgrcv(msgid, &inmsg, 80, 0, 0);
+	if(strcmp(inmsg.mtext, "Start") == 0){
+		printf("상대방과 연결되었습니다!\n곧 게임이 시작됩니다.\n");
+		strcpy(mesg.mtext, "Connect");
+		msgsnd(mesgid, (void *)&mesg, 80, 0);
+	}
 	while(1){
 		if(isend){
-			break;
+			return 0;
 		}
 		if(turn){
 			scanf("%d %d", &x, &y);
 			sprintf(buf,"%d",x);
-			printf("%s\n", buf);
 			strcpy(mesg.mtext, buf);
 			msgsnd(mesgid, (void *)&mesg, 80, 0);
 			sprintf(buf,"%d",y);
-			printf("%s\n", buf);
 			strcpy(mesg.mtext, buf);
 			msgsnd(mesgid, (void *)&mesg, 80, 0);
 			len = msgrcv(msgid, &inmsg, 80, 0, 0);
+			if(x > 19 || y > 19 || x < 1 || y < 1){
+				printf("1~20의 수만 입력해주세요.\n");
+				continue;
+			}
 			if(strcmp(inmsg.mtext, "exist") == 0){
 				printf("돌이 이미 있습니다.\n");
 				continue;

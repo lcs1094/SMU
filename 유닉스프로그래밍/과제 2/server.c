@@ -256,7 +256,7 @@ int main(void){
 	key = 2015;
     key2 = 11053;
 	msgid = msgget(key, IPC_CREAT|0644);
-    mesgid = msgget(key2, 0);
+    mesgid = msgget(key2, IPC_CREAT|0644);
     inmsg.mtype = 2;
 	mesg.mtype = 1;
 	int len;
@@ -267,7 +267,17 @@ int main(void){
 	drawmok(mok);
 	bool turn = true;
 
-	do{
+	strcpy(mesg.mtext, "Start");
+	msgsnd(msgid, (void *)&mesg, 80, 0);
+	printf("상대를 기다리고 있습니다...\n");
+	len = msgrcv(mesgid, &inmsg, 80, 0, 0);
+	printf("%s\n", inmsg.mtext);
+	if(strcmp(inmsg.mtext, "Connect") != 0){
+		printf("연결에 오류가 발생하였습니다.\n프로그램을 종료합니다.\n");
+		msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);
+		exit(1);
+	}
+	do{		
 		// srand(time(NULL));
 		// x = rand()%10+1;
 		// sleep(1);
@@ -279,11 +289,9 @@ int main(void){
 			len = msgrcv(mesgid, &inmsg, 80, 0, 0);
 			char *string = inmsg.mtext;
 			cx = atoi(string);
-			printf("%d\n", cx);
 			len = msgrcv(mesgid, &inmsg, 80, 0, 0);
 			string = inmsg.mtext;
 			cy = atoi(string);
-			printf("%d\n", cy);
 		}
 		if(x > 19 || y > 19 || x < 1 || y < 1){
 			printf("1~20의 수만 입력해주세요.\n");
@@ -291,6 +299,15 @@ int main(void){
 		}
 		if(turn && strcmp(mok[x][y*2-1], "O") == 0){
 			printf("돌이 이미 있습니다.\n");
+			continue;
+		}
+		if(turn && strcmp(mok[x][y*2-1] , "X") == 0 ){
+			printf("돌이 이미 있습니다.\n");
+			continue;
+		}
+		if(!turn && strcmp(mok[cx][cy*2-1], "O") == 0){
+			strcpy(mesg.mtext, "exist");
+			msgsnd(msgid, (void *)&mesg, 80, 0);
 			continue;
 		}
 		if(!turn && strcmp(mok[cx][cy*2-1] , "X") == 0 ){
@@ -316,19 +333,21 @@ int main(void){
 		msgsnd(msgid, (void *)&mesg, 80, 0);
 		gameset = check(mok);
 		if(gameset == 1){
-			strcpy(mesg.mtext, "O 승리!\n");
+			strcpy(mesg.mtext, "OWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
 			printf("O 승리!\n");
 			break;
 		}
 		else if(gameset == 2){
-			strcpy(mesg.mtext, "X 승리!\n");
+			strcpy(mesg.mtext, "XWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
 			printf("X 승리!\n");
 			break;
 		}
 		count ++;
 	}while(count<(361/2));
+	msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);
+	msgctl(mesgid, IPC_RMID, (struct msqid_ds *)NULL);
 	return 0;
 }
 
