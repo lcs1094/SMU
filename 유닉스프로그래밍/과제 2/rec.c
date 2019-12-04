@@ -26,6 +26,7 @@ struct mymsgbuf mesg;
 int msgid;
 int mesgid;
 bool isend = false;
+int gameset = 0;
 
 union semun{
 	int val;
@@ -113,18 +114,31 @@ void readMok(){
 		if(strcmp(inmsg.mtext, "EM") == 0){
 			return;
 		}
-		if(strcmp(inmsg.mtext, "XWIN") == 0){
-			printf("X 승리!\n");
-			isend = true;
-			return;
-		}
-		else if(strcmp(inmsg.mtext, "OWIN") == 0){
-			printf("O 승리!\n");
-			isend = true;
-			return;
-		}
 		printf("%s", inmsg.mtext);
 	}
+}
+void gamecheck(){
+	int len;
+	len = msgrcv(msgid, &inmsg, 80, 0, 0);
+	if(strcmp(inmsg.mtext, "XWIN") == 0){
+		// printf("X 승리!\n");
+		// isend = true;
+		gameset = 1;
+		return;
+	}
+	else if(strcmp(inmsg.mtext, "OWIN") == 0){
+		// printf("O 승리!\n");
+		// isend = true;
+		gameset = 2;
+		return;
+	}
+	else{
+		if(strcmp(inmsg.mtext, "Notyet") == 0){
+			gameset = 0;
+			return;
+		}
+	}
+
 }
 int main(void) {
 	int sd;
@@ -158,8 +172,14 @@ int main(void) {
 		strcpy(mesg.mtext, "Connect");
 		msgsnd(mesgid, (void *)&mesg, 80, 0);
 	}
+	gameset = 0;
 	while(1){
-		if(isend){
+		if(gameset == 1){
+			printf("승리!\n");
+			return 0;
+		}
+		else if(gameset == 2){
+			printf("패배!\n");
 			return 0;
 		}
 		if(turn){
@@ -183,6 +203,7 @@ int main(void) {
 				turn = !turn;
 				system("clear");
 				readMok();
+				gamecheck();
 			}
 		}
 		else{
@@ -190,6 +211,7 @@ int main(void) {
 			if(strcmp(inmsg.mtext, "complete") == 0){
 				system("clear");
 				readMok();
+				gamecheck();
 				turn = !turn;
 			}
 		}

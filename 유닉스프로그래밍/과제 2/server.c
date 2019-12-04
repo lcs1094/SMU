@@ -271,8 +271,10 @@ int main(void){
 	msgsnd(msgid, (void *)&mesg, 80, 0);
 	printf("상대를 기다리고 있습니다...\n");
 	len = msgrcv(mesgid, &inmsg, 80, 0, 0);
-	printf("%s\n", inmsg.mtext);
-	if(strcmp(inmsg.mtext, "Connect") != 0){
+	if(strcmp(inmsg.mtext, "Connect") == 0){
+		printf("상대방과 연결되었습니다.\n곧 게임이 시작됩니다.\n");
+	}
+	else{
 		printf("연결에 오류가 발생하였습니다.\n프로그램을 종료합니다.\n");
 		msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);
 		exit(1);
@@ -335,14 +337,20 @@ int main(void){
 		if(gameset == 1){
 			strcpy(mesg.mtext, "OWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
-			printf("O 승리!\n");
+			printf("승리!\n");
+			sleep(1);
 			break;
 		}
 		else if(gameset == 2){
 			strcpy(mesg.mtext, "XWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
-			printf("X 승리!\n");
+			printf("패배!\n");
+			sleep(1);
 			break;
+		}
+		else{
+			strcpy(mesg.mtext, "Notyet");
+			msgsnd(msgid, (void *)&mesg, 80, 0);
 		}
 		count ++;
 	}while(count<(361/2));
