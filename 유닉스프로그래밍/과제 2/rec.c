@@ -131,13 +131,20 @@ void handler(int signo) {
 	printf("\n지금 게임을 종료하면 몰수패로 처리됩니다. 게임을 종료하시겠습니까?\n");
 	scanf("%s", ans);
 	if(ans[0] == 'Y' || ans[0] == 'y'){
-		system("date >> .client_log.log");
 		fprintf(fp,"패배\n");
 		fclose(fp);
 		strcpy(sigmsg.mtext, "QUIT");
 		msgsnd(sigid, (void *)&sigmsg, 80, 0);
 		exit(1);
 	}
+}
+void alarmhandler(int signo){
+	printf("장시간 좌표를 입력하지 않아 몰수패 처리 됩니다.\n");
+	fprintf(fp,"패배\n");
+	fclose(fp);
+	strcpy(sigmsg.mtext, "QUIT");
+	msgsnd(sigid, (void *)&sigmsg, 80, 0);
+	exit(1);
 }
 void readMok(){
 	int len;
@@ -198,20 +205,18 @@ int main(int argc, char *argv[]) {
 	mesg.mtype = 2;
 	sigmsg.mtype = 3;
 	struct sigaction act;
+	struct sigaction act2;
 	sigemptyset(&act.sa_mask);
-	sigaddset(&act.sa_mask, SIGQUIT);
+	sigemptyset(&act2.sa_mask);
+	sigaddset(&act2.sa_mask, SIGALRM);
 	act.sa_flags = 0;
 	act.sa_handler = handler;
-	if (sigaction(SIGINT, &act, (struct sigaction *)NULL) < 0) {
-		perror("sigaction");
-		exit(1);
-	}
-	len = msgrcv(msgid, &inmsg, 80, 0, 0);
-	if(strcmp(inmsg.mtext, "Start") == 0){
-		printf("상대방과 연결되었습니다!\n곧 게임이 시작됩니다.\n");
-		strcpy(mesg.mtext, "Connect");
-		msgsnd(mesgid, (void *)&mesg, 80, 0);
-	}
+	act2.sa_flags = 0;
+	act2.sa_handler = alarmhandler;
+	sigaction(SIGINT, &act, (struct sigaction *)NULL);
+	sigaction(SIGQUIT, &act, (struct sigaction *)NULL);
+	sigaction(SIGTSTP, &act, (struct sigaction *)NULL);
+	sigaction(SIGALRM, &act2, (struct sigaction *)NULL);
 	gameset = 0;
 	if(argc > 1){
 		while((n = getopt(argc, argv, "hlb")) != -1){
@@ -230,20 +235,26 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 	fp = fopen(".client_log.log", "a");
+	system("date >> .client_log.log");
+	len = msgrcv(msgid, &inmsg, 80, 0, 0);
+	if(strcmp(inmsg.mtext, "Start") == 0){
+		printf("상대방과 연결되었습니다!\n곧 게임이 시작됩니다.\n");
+		strcpy(mesg.mtext, "Connect");
+		msgsnd(mesgid, (void *)&mesg, 80, 0);
+	}
 	while(1){
 		if(gameset == 1){
 			printf("승리!\n");
-			system("date >> .client_log.log");
 			fprintf(fp,"승리\n");
 			return 0;
 		}
 		else if(gameset == 2){
 			printf("패배!\n");
-			system("date >> .client_log.log");
 			fprintf(fp,"패배\n");
 			return 0;
 		}
 		if(turn){
+			alarm(10);
 			do{
 				printf("좌표를 입력하세요 : ");
 				scannum = scanf("%d %d", &y, &x);
@@ -272,6 +283,7 @@ int main(int argc, char *argv[]) {
 				readMok();
 				gamecheck();
 			}
+			alarm(3600);
 		}
 		else{
 			len = msgrcv(msgid, &inmsg, 80, 0, 0);
