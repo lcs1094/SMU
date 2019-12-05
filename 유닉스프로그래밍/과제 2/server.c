@@ -21,9 +21,11 @@ struct mymsgbuf{
 };
 struct mymsgbuf mesg;
 struct mymsgbuf inmsg;
+struct mymsgbuf sigmsg;
 int msgid;
 int mesgid;
-
+int sigid;
+bool quit = false;
 union semun{
 	int val;
 	struct semid_ds *buf;
@@ -95,6 +97,11 @@ void printMok(char mok[20][38][4]);
 int check(char mok[20][38][4]);
 
 void printMok(char mok[20][38][4]){
+	int stopsig = msgrcv(sigid, &sigmsg, 80, 0, IPC_NOWAIT);	
+	if(strcmp(sigmsg.mtext, "QUIT") == 0){
+		quit = true;
+		return;
+	}
 	mesg.mtype = 1;
 	for(int i=0;i<20;i++){
 		for(int j=0;j<38;j++){
@@ -122,6 +129,9 @@ int check(char mok[20][38][4]){	// 1 : o승 2 : x승 3: 무승부
 	int x_checkpoint_v = 50;
 	int x_checkpoint_h = 50;
 	int ii,jj;
+	if(quit){
+		return 4;
+	}
 	for(i=1;i<20;i++){
 		for(j=1;j<20;j++){
 			if(strcmp(mok[i][j*2-1] , "O") == 0){
@@ -244,22 +254,28 @@ void drawmok(char mok[20][38][4]){
 
 int main(void){
 	int x,y;
+	FILE *fp;
+	fp = fopen(".server_log.log", "a");
 	int cx,cy;	// client의 좌표
 	int count = 0;
 	int gameset;
 	int num = 0;
 	key_t key;
     key_t key2;
+	key_t key3;
 	int semid;
 	pid_t pid = getpid();
 	semid = initsem(1);
 	key = 2015;
     key2 = 11053;
+	key3 = 01010011;
 	msgid = msgget(key, IPC_CREAT|0644);
     mesgid = msgget(key2, IPC_CREAT|0644);
+	sigid = msgget(key3, IPC_CREAT|0644);
     inmsg.mtype = 2;
 	mesg.mtype = 1;
 	int len;
+	int scannum = 0;
 	char buf[256];
 	struct sockaddr_in sin, cli;
 	int sd, ns, clientlen = sizeof(cli);
@@ -279,15 +295,29 @@ int main(void){
 		msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);
 		exit(1);
 	}
-	do{		
+	int stopsig = msgrcv(sigid, &sigmsg, 80, 0, IPC_NOWAIT);
+	do{
 		// srand(time(NULL));
 		// x = rand()%10+1;
 		// sleep(1);
 		// y = rand()%10+1;
 		if(turn){
-			scanf("%d %d", &x, &y);
+			do{
+				printf("좌표를 입력하세요 : ");
+				scannum = scanf("%d %d", &y, &x);
+				while (getchar() != '\n');
+			}while(scannum != 2);
 		}
 		else{
+			stopsig = msgrcv(sigid, &sigmsg, 80, 0, 0);
+			if(strcmp(sigmsg.mtext, "QUIT") == 0){
+				printf("상대방이 게임을 종료하였습니다.\n");
+				printf("몰수승으로 처리됩니다.\n");
+				system("date >> .server_log.log");
+				fprintf(fp, "승리\n");
+				sleep(1);
+				break;
+			}
 			len = msgrcv(mesgid, &inmsg, 80, 0, 0);
 			char *string = inmsg.mtext;
 			cx = atoi(string);
@@ -337,14 +367,26 @@ int main(void){
 		if(gameset == 1){
 			strcpy(mesg.mtext, "OWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
+			system("date >> server_log.log");
 			printf("승리!\n");
+			fprintf(fp, "승리\n");
 			sleep(1);
 			break;
 		}
 		else if(gameset == 2){
 			strcpy(mesg.mtext, "XWIN");
 			msgsnd(msgid, (void *)&mesg, 80, 0);
+			system("date >> server_log.log");
 			printf("패배!\n");
+			fprintf(fp,"패배\n");
+			sleep(1);
+			break;
+		}
+		else if(gameset == 4){
+			printf("상대방이 게임을 종료하였습니다.\n");
+			printf("몰수승으로 처리됩니다.\n");
+			system("date >> .server_log.log");
+			fprintf(fp, "승리\n");
 			sleep(1);
 			break;
 		}
@@ -354,8 +396,10 @@ int main(void){
 		}
 		count ++;
 	}while(count<(361/2));
+	fclose(fp);
 	msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);
 	msgctl(mesgid, IPC_RMID, (struct msqid_ds *)NULL);
+	msgctl(sigid, IPC_RMID, (struct msqid_ds *)NULL);
 	return 0;
 }
 
