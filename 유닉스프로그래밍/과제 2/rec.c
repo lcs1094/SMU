@@ -14,7 +14,6 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <errno.h>
-#include <time.h>
 #define PORTNUM 9000
 
 struct mymsgbuf{	// 메세지 버퍼 구조체 선언
@@ -105,6 +104,19 @@ void readMok(){	// 오목판 메시지를 받는 함수
 		if(strcmp(inmsg.mtext, "EM") == 0){	// EM 메시지를 받으면 종료
 			return;
 		}
+		if(strcmp(inmsg.mtext, "QUIT") == 0){	// 상대방이 연결을 종료하면
+			printf("상대방이 게임을 종료하였습니다.\n");
+			printf("몰수승으로 처리됩니다.\n");
+			time(&t);		// 시간 구조체 t에 현재 시간을 저장
+			int endtime = (int)t - starttime;	// 현재시간에서 시작 시간을 빼고 endtime에 저장
+			fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);	// 진행된 시간을 분,초 형식으로 로그파일에 기록
+			fprintf(fp, "승리\t(몰수승)\n\n");	// "승리" 문자열을 로그에 기록
+			msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제
+			msgctl(mesgid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제2
+			msgctl(sigid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제3
+			fclose(fp);	// fp 파일 닫음
+			exit(1);	// 프로그램 종료
+		}
 		printf("%s", inmsg.mtext);	// 받은 메시지를 출력한다.
 	}
 }
@@ -118,6 +130,10 @@ void gamecheck(){	// 게임의 종료를 판별하는 함수
 	else if(strcmp(inmsg.mtext, "OWIN") == 0){	// 위와 동일, XWIN -> OWIN
 		gameset = 2;
 		return;
+	}
+	else if(strcmp(inmsg.mtext, "QUIT") == 0){	// 상대방이 연결을 종료하면
+		gameset = 3;	// 몰수승 처리
+		return;			// 함수 종료
 	}
 	else{
 		if(strcmp(inmsg.mtext, "Notyet") == 0){	// Notyet을 받으면 
@@ -196,7 +212,7 @@ int main(int argc, char *argv[]) {
 			int endtime = (int)t - starttime;	// 현재시간에서 시작 시간을 빼고 endtime에 저장
 			fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);	// 진행된 시간을 분,초 형식으로 로그파일에 기록
 			fprintf(fp,"승리\n\n");	// 승리를 로그파일에 기록
-			return 0;	// main 종료
+			break;	// 반복문 종료
 		}
 		else if(gameset == 2){	// OWIN을 받았으면
 			printf("패배!\n");	// client의 패배, 위와 동일
@@ -204,11 +220,23 @@ int main(int argc, char *argv[]) {
 			int endtime = (int)t - starttime;
 			fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);
 			fprintf(fp,"패배\n\n");
-			return 0;
+			break;	// 반복문 종료
+		}
+		else if(gameset == 3){	// 상대방이 연결을 종료하면
+			printf("상대방이 게임을 종료하였습니다.\n");
+			printf("몰수승으로 처리됩니다.\n");
+			time(&t);		// 시간 구조체 t에 현재 시간을 저장
+			int endtime = (int)t - starttime;	// 현재시간에서 시작 시간을 빼고 endtime에 저장
+			fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);	// 진행된 시간을 분,초 형식으로 로그파일에 기록
+			fprintf(fp, "승리\t(몰수승)\n\n");	// "승리" 문자열을 로그에 기록
+			msgctl(msgid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제
+			msgctl(mesgid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제2
+			msgctl(sigid, IPC_RMID, (struct msqid_ds *)NULL);	// 메시지큐 삭제3
+			break;	// 반복문 종료
 		}
 		if(turn){	// client의 턴이면
-			alarm(10);	// 알람을 10초로 설정, 10초 후 alarmhandler 실행
 			do{
+				alarm(10);	// 알람을 10초로 설정, 10초 후 alarmhandler 실행
 				printf("좌표를 입력하세요 : ");	// 좌표를 입력받음
 				scannum = scanf("%d %d", &y, &x);	// 좌표계를 x,y 좌표계로 사용하기 위해 반대로 입력을 받음
 				while (getchar() != '\n');	// 버퍼 삭제
@@ -230,6 +258,10 @@ int main(int argc, char *argv[]) {
 				printf("돌이 이미 있습니다.\n");
 				continue;	// 이미 해당 좌표에 돌이 있으므로 반복문 재실행
 			}
+			if(strcmp(inmsg.mtext, "QUIT") == 0){	// 받은 메시지가 "QUIT"이면
+				gameset = 3;	// 몰수승 처리
+				continue;		// 반복문을 다시 실행
+			}
 			if(strcmp(inmsg.mtext, "complete") == 0){	// 받은 메시지가 complete이면
 				turn = !turn;	// 턴을 변경
 				system("clear");	// 화면을 지움
@@ -242,6 +274,10 @@ int main(int argc, char *argv[]) {
 		}
 		else{	// 자신의 턴이 아니면
 			len = msgrcv(msgid, &inmsg, 80, 0, 0);	// 서버로부터 메시지를 수신
+			if(strcmp(inmsg.mtext, "QUIT") == 0){	// 받은 메시지가 "QUIT"이면
+				gameset = 3;	// 몰수승 처리
+				continue;		// 반복문을 다시 실행
+			}
 			if(strcmp(inmsg.mtext, "complete") == 0){	// 메시지가 Complete이면
 				system("clear");		// 화면을 지움
 				readMok();	// 오목판을 읽어오는 함수 실행

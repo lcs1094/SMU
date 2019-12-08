@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <sys/msg.h>
+#include <signal.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <errno.h>
@@ -31,6 +32,39 @@ time_t t;				// 시간 구조체 t 선언
 int starttime;			// 게임 시작 시간 변수 선언
 void printMok(char mok[20][38][4]);	// 오목판을 출력하는 함수 printMok 선언
 int check(char mok[20][38][4]);		// 오목의 경기 종료를 판단할 함수 check 선언
+FILE *fp;	// 로그파일을 설정할 파일 구조체 fp 선언
+
+void handler(int signo) {	// 지정된 시그널을 처리할 핸들러 함수
+	char ans[BUFSIZ];		// 대답을 저장할 char배열 선언
+	printf("\n지금 게임을 종료하면 몰수패로 처리됩니다. 게임을 종료하시겠습니까?\n");
+	scanf("%s", ans);		// 대답을 입력받음
+	if(ans[0] == 'Y' || ans[0] == 'y'){	// 입력받은 대답이 Y,y로 시작하면
+		time(&t);			// 현재 시간을 t에 저장
+		int endtime = (int)t - starttime;	// 현재 시간에서 starttime을 뺌
+		fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);	// 분과 초로 나누어 파일에 기록
+		fprintf(fp,"패배\t(강제 종료)\n\n");	// 파일에 강제 종료로 인한 패배를 기록
+		fclose(fp);		// 파일 종료
+		strcpy(mesg.mtext, "QUIT");	// 클라이언트로 QUIT 메시지 전송
+		msgsnd(msgid, (void *)&mesg, 80, 0);
+		printf("종료를 기다리는 중입니다...\n");
+		sleep(1);	// 클라이언트의 메시지 처리 대기
+		exit(1);	// 프로그램 종료
+	}
+}
+
+void alarmhandler(int signo){	// 알람 시그널 핸들러 함수
+	printf("장시간 좌표를 입력하지 않아 몰수패 처리 됩니다.\n");
+	time(&t);	// 위와 동일, 시간 처리부분
+	int endtime = (int)t - starttime;
+	fprintf(fp, "게임 시간 : %02d분%02d초\n", endtime/60, endtime%60);
+	fprintf(fp,"패배\t(시간 초과)\n\n");
+	fclose(fp);
+	strcpy(mesg.mtext, "QUIT");	// 위와 동일
+	msgsnd(msgid, (void *)&mesg, 80, 0);
+	printf("종료를 기다리는 중입니다...\n");
+	sleep(1);	// 클라이언트의 메시지 처리 대기
+	exit(1);
+}
 
 void printMok(char mok[20][38][4]){	// printMok 정의
 // 특수문자는 2바이트이므로 3차원 배열을 통하여 오목판을 정의하였음
@@ -188,7 +222,6 @@ void drawmok(char mok[20][38][4]){	// 오목판을 그릴 함수 drawmok
 
 int main(void){
 	int x,y;	// 좌표를 입력받을 x, y 선언
-	FILE *fp;	// 로그파일을 설정할 파일 구조체 fp 선언
 	fp = fopen(".server_log.log", "a");
 	int cx,cy;	// client의 좌표 cx, cy 선언
 	int count = 0;	// 턴 수를 셀 count 선언
@@ -211,6 +244,20 @@ int main(void){
 	char mok[20][38][4] = {"",};	// 오목판 배열 선언, 2바이트 특수문자를 수용하기 위해 3차원 배열로 선언
 	drawmok(mok);		// 빈 오목판을 그릴 drawmok함수 호출
 	bool turn = true;	// 자신의 턴임을 설정할 bool 선언
+	struct sigaction act;	// 강제종료 시그널을 처리할 구조체 act
+	struct sigaction act2;	// 알람 시그널을 처리할 구조체 act2
+	sigemptyset(&act.sa_mask);	// act의 시그널 집합을 초기화
+	sigemptyset(&act2.sa_mask);	// act2의 시그널 집합을 초기화
+	sigaddset(&act2.sa_mask, SIGALRM);	// act2 시그널 집합에 SIGALRM 추가
+	act.sa_flags = 0;	// flag를 0으로 설정
+	act.sa_handler = handler;	// 시그널을 받으면 handler 함수 실행
+	act2.sa_flags = 0;	// flag를 0으로 설정
+	act2.sa_handler = alarmhandler;	// 시그널을 받으면 alarmhandler 함수 실행
+	sigaction(SIGINT, &act, (struct sigaction *)NULL);	// act에 SIGINT 시그널을 적용
+	sigaction(SIGQUIT, &act, (struct sigaction *)NULL);	// act에 SIGQUIT 시그널을 적용
+	sigaction(SIGTSTP, &act, (struct sigaction *)NULL);	// act에 SIGTSTP 시그널을 적용
+	sigaction(SIGALRM, &act2, (struct sigaction *)NULL);	// act2에 SIGALRM 시그널을 적용
+
 
 	strcpy(mesg.mtext, "Start");	// Start 메시지 생성
 	msgsnd(msgid, (void *)&mesg, 80, 0);	// 메시지 전송
@@ -235,14 +282,18 @@ int main(void){
 	do{	// 반복문 시작
 		if(turn){	// 자신의 턴이면
 			do{
+				alarm(10);	// 알람을 10초로 설정, 10초 후 alarmhandler 실행
 				printf("좌표를 입력하세요 : ");
 				scannum = scanf("%d %d", &y, &x);	// 좌표를 입력받아 성공적으로 입력받은 개수를 scannum에 저장
 				// 열이 x, 행이 y이므로 반대로 입력받아 저장함
 				while (getchar() != '\n');	// 버퍼 삭제
 			}while(scannum != 2);	// 좌표가 숫자 2개로 받을 동안 반복하여 좌표를 입력받음
+			alarm(3600);	// 알람을 3600초로 설정, alarm은 시간을 재설정 시 기존의 alarm을 대체하므로
+							// 10초 내에 입력을 하였다면 상대방의 입력을 기다린다.
+							// 다시 자신의 턴이 돌아오면 제한시간은 10초로 재설정된다.
 		}
 		else{	// 자신의 턴이 아니면
-			stopsig = msgrcv(sigid, &sigmsg, 80, 0, 0);	// 시그널 대기
+			stopsig = msgrcv(sigid, &sigmsg, 80, 0, 0);	// 시그널 대기, 종료가 아니면 "go"를 받음
 			if(strcmp(sigmsg.mtext, "QUIT") == 0){	// 강제 종료 시그널이 수신되면
 				printf("상대방이 게임을 종료하였습니다.\n");
 				printf("몰수승으로 처리됩니다.\n");
